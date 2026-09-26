@@ -28,11 +28,9 @@ mod tests {
 
     #[test]
     fn snapshot_has_evidence() {
-        assert!(
-            RecoveryCapability::SnapshotRestore {
-                evidence_id: "snapshot-123".into()
-            }
-            .requires_prepared_evidence()
-        );
+        assert!(RecoveryCapability::SnapshotRestore {
+            evidence_id: "snapshot-123".into()
+        }
+        .requires_prepared_evidence());
     }
 }
