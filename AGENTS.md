@@ -25,6 +25,8 @@ CER is not an enforcement boundary while a protected caller retains an alternate
 15. Reusing a provider idempotency key authorizes retry only for the identical canonical request and only while the adapter can establish that the provider's target-specific idempotency guarantee still applies.
 16. Caller-supplied text is never trusted merely because it is labeled canonical.
 17. Inputs outside CER's supported JCS/I-JSON profile fail before approval fingerprinting.
+18. Duplicate raw JSON object members are rejected before fingerprinting.
+19. Adapters execute from validated structured arguments, never by independently reparsing the pre-approval raw payload.
 
 ## Engineering rules
 - Read relevant ADRs and threat model before semantic changes.
@@ -36,8 +38,8 @@ CER is not an enforcement boundary while a protected caller retains an alternate
 - Adapter retry/recovery claims require target-specific evidence and conformance tests.
 - Idempotency-key reuse alone is not evidence of retry safety; target scope and provider semantics matter.
 - Do not introduce a second canonicalization scheme for capabilities or receipts; bind them to the canonical action fingerprint.
-- The raw ingress parser remains security-critical until duplicate-key and source-level input-profile checks exist.
+- Future ingress handlers must use `ActionArguments` strict parsing for untrusted JSON.
 - Prefer deterministic tests; use fault injection for partial failures.
 - Any new security-sensitive dependency needs explicit justification in an ADR.
 - No unsafe Rust in core/adapters without an approved ADR.
-- Scope changes to state machine, trust boundary, recovery, delegation, persistence, canonicalization, or adapter contract require an ADR.
+- Scope changes to state machine, trust boundary, recovery, delegation, persistence, canonicalization, ingress parsing, or adapter contract require an ADR.
