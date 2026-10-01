@@ -203,8 +203,7 @@ mod tests {
 
     #[test]
     fn raw_ingress_enforces_numeric_profile() {
-        let error =
-            ActionArguments::from_json_str(r#"{"id":9007199254740992}"#).unwrap_err();
+        let error = ActionArguments::from_json_str(r#"{"id":9007199254740992}"#).unwrap_err();
 
         assert_eq!(
             error,
@@ -216,9 +215,8 @@ mod tests {
 
     #[test]
     fn serializable_input_enforces_same_profile() {
-        let error =
-            ActionArguments::from_serializable(&json!({"id": 9_007_199_254_740_992_u64}))
-                .unwrap_err();
+        let error = ActionArguments::from_serializable(&json!({"id": 9_007_199_254_740_992_u64}))
+            .unwrap_err();
 
         assert!(matches!(
             error,
