@@ -2,7 +2,9 @@
 Status: Accepted provisionally for M1
 
 ## Context
-A generic success/error return is insufficient for consequential external mutations. After request dispatch, a timeout may mean no remote effect, a committed effect with a lost acknowledgement, or an outcome the caller cannot determine. Retry safety also varies by target: some operations are repeatable, some are safe only when the same provider idempotency key is reused, and some require reconciliation before any retry.
+A generic success/error return is insufficient for consequential external mutations. After request dispatch, a timeout may mean no remote effect, a committed effect with a lost acknowledgement, or an outcome the caller cannot determine. Retry safety also varies by target: some operations are repeatable, some are safe only when the same provider idempotency key is reused under the provider's documented scope and validity rules, and some require reconciliation before any retry.
+
+Provider idempotency is not a universal property of a string token. The provider can bind the guarantee to request parameters, caller, Region, Availability Zone, cluster, time interval, or another target-specific scope. Reusing the same token outside that contract must not be treated as safe.
 
 Recovery semantics are similarly target-specific. A runtime must not infer that an operation is reversible merely because an inverse-looking API exists.
 
@@ -15,7 +17,7 @@ Before a protected effect executes, its target adapter must provide an `EffectCo
 
 Preparation returns a `PreparedEffect` coupling the contract to the target-specific prepared operation and prepared recovery capability. The adapter API rejects a prepared effect whose recovery capability contradicts the contract.
 
-The kernel's retry decision for an unknown outcome is deterministic. Request substitution fails closed. Stable-idempotency-key retries require reuse of the same key. Operations requiring reconciliation cannot be retried directly. If the adapter declares that reconciliation is unavailable, direct retry is denied.
+The kernel's retry decision for an unknown outcome is deterministic. Request substitution fails closed. Stable-idempotency-key retries require the identical canonical request, reuse of the same key, and an adapter-established assertion that the provider's idempotency guarantee remains valid for the current target scope. Operations requiring reconciliation cannot be retried directly. If the adapter declares that reconciliation is unavailable, direct retry is denied.
 
 If reconciliation cannot prove effect or no-effect, the execution enters `IN_DOUBT`.
 
