@@ -113,10 +113,7 @@ mod tests {
         let mut context = retry_context();
         context.same_canonical_request = false;
 
-        assert_eq!(
-            contract.retry_after_unknown(context),
-            RetryDecision::Denied
-        );
+        assert_eq!(contract.retry_after_unknown(context), RetryDecision::Denied);
     }
 
     #[test]
@@ -141,10 +138,7 @@ mod tests {
         let mut context = retry_context();
         context.same_idempotency_key = false;
 
-        assert_eq!(
-            contract.retry_after_unknown(context),
-            RetryDecision::Denied
-        );
+        assert_eq!(contract.retry_after_unknown(context), RetryDecision::Denied);
 
         assert_eq!(
             contract.retry_after_unknown(retry_context()),
@@ -161,10 +155,7 @@ mod tests {
         let mut context = retry_context();
         context.provider_idempotency_guarantee_valid = false;
 
-        assert_eq!(
-            contract.retry_after_unknown(context),
-            RetryDecision::Denied
-        );
+        assert_eq!(contract.retry_after_unknown(context), RetryDecision::Denied);
     }
 
     #[test]
