@@ -14,3 +14,4 @@
 - **INV-012 Fail-closed capability use:** expired, revoked, replayed, substituted, or stale capabilities cannot authorize execution.
 - **INV-013 Effect declaration:** before execution, a protected effect declares mutation, retry, outcome-resolution, and recovery semantics.
 - **INV-014 In-doubt truth:** failed reconciliation that cannot prove either effect or no-effect enters `IN_DOUBT`; it is not converted to success, ordinary failure, or an automatic retry.
+- **INV-015 Idempotency scope:** reusing a provider idempotency key permits retry only for the identical canonical request and only while the adapter can establish that the provider's target-specific idempotency guarantee still applies.
