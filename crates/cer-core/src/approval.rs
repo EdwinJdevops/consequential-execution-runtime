@@ -1,20 +1,19 @@
-use crate::identity::{fingerprint, validate_jcs_value, ActionFingerprint, FingerprintError};
+use crate::arguments::ActionArguments;
+use crate::identity::{fingerprint, ActionFingerprint, FingerprintError};
 use serde::Serialize;
-use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ProposedAction {
     pub action_id: String,
     pub resource_id: String,
     pub operation: String,
-    pub arguments: Value,
+    pub arguments: ActionArguments,
     pub observed_state: String,
     pub policy_version: String,
 }
 
 impl ProposedAction {
     pub fn fingerprint(&self) -> Result<ActionFingerprint, FingerprintError> {
-        validate_jcs_value(&self.arguments)?;
         fingerprint(self)
     }
 }
@@ -45,12 +44,19 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn arguments(value: serde_json::Value) -> ActionArguments {
+        ActionArguments::from_serializable(&value).unwrap()
+    }
+
     fn action() -> ProposedAction {
         ProposedAction {
             action_id: "a-1".into(),
             resource_id: "db/customer".into(),
             operation: "schema-migrate".into(),
-            arguments: json!({"migration": 42, "options": {"lock_timeout": "5s"}}),
+            arguments: arguments(json!({
+                "migration": 42,
+                "options": {"lock_timeout": "5s"}
+            })),
             observed_state: "version=10".into(),
             policy_version: "p1".into(),
         }
@@ -99,7 +105,10 @@ mod tests {
         let original = action();
         let binding = ApprovalBinding::bind(&original).unwrap();
         let mut changed = original;
-        changed.arguments = json!({"migration": 43, "options": {"lock_timeout": "5s"}});
+        changed.arguments = arguments(json!({
+            "migration": 43,
+            "options": {"lock_timeout": "5s"}
+        }));
 
         assert!(!binding.matches(&changed).unwrap());
     }
@@ -125,27 +134,29 @@ mod tests {
     }
 
     #[test]
+    fn json_object_property_order_does_not_change_fingerprint() {
+        let mut first = action();
+        first.arguments =
+            ActionArguments::from_json_str(r#"{"region":"us-east-1","count":2}"#).unwrap();
+
+        let mut second = action();
+        second.arguments =
+            ActionArguments::from_json_str(r#"{"count":2,"region":"us-east-1"}"#).unwrap();
+
+        assert_eq!(first.fingerprint().unwrap(), second.fingerprint().unwrap());
+    }
+
+    #[test]
     fn unicode_is_not_normalized_before_fingerprinting() {
         let mut composed = action();
-        composed.arguments = json!({"name": "\u{00E9}"});
+        composed.arguments = arguments(json!({"name": "\u{00E9}"}));
 
         let mut decomposed = action();
-        decomposed.arguments = json!({"name": "e\u{0301}"});
+        decomposed.arguments = arguments(json!({"name": "e\u{0301}"}));
 
         assert_ne!(
             composed.fingerprint().unwrap(),
             decomposed.fingerprint().unwrap()
         );
-    }
-
-    #[test]
-    fn invalid_jcs_profile_input_cannot_be_bound() {
-        let mut invalid = action();
-        invalid.arguments = json!({"id": 9_007_199_254_740_992_u64});
-
-        assert!(matches!(
-            ApprovalBinding::bind(&invalid),
-            Err(FingerprintError::NonInteroperableInteger(_))
-        ));
     }
 }
