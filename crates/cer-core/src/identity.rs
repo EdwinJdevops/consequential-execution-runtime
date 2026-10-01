@@ -46,9 +46,7 @@ impl Display for FingerprintError {
 
 impl Error for FingerprintError {}
 
-pub(crate) fn fingerprint<T: Serialize>(
-    value: &T,
-) -> Result<ActionFingerprint, FingerprintError> {
+pub(crate) fn fingerprint<T: Serialize>(value: &T) -> Result<ActionFingerprint, FingerprintError> {
     let canonical = canonical_bytes(value)?;
     let digest = Sha256::digest(canonical);
     let mut bytes = [0_u8; 32];
