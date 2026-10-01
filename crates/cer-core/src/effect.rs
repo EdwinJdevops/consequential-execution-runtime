@@ -47,6 +47,7 @@ pub struct EffectContract {
 pub struct RetryContext {
     pub same_canonical_request: bool,
     pub same_idempotency_key: bool,
+    pub provider_idempotency_guarantee_valid: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +66,7 @@ impl EffectContract {
         match self.retry {
             RetrySemantics::RepeatableAfterUnknown => RetryDecision::Allowed,
             RetrySemantics::StableIdempotencyKeyRequired => {
-                if context.same_idempotency_key {
+                if context.same_idempotency_key && context.provider_idempotency_guarantee_valid {
                     RetryDecision::Allowed
                 } else {
                     RetryDecision::Denied
@@ -95,18 +96,25 @@ mod tests {
         }
     }
 
+    fn retry_context() -> RetryContext {
+        RetryContext {
+            same_canonical_request: true,
+            same_idempotency_key: true,
+            provider_idempotency_guarantee_valid: true,
+        }
+    }
+
     #[test]
     fn repeatable_unknown_requires_identical_request() {
         let contract = contract(
             RetrySemantics::RepeatableAfterUnknown,
             OutcomeResolution::Unavailable,
         );
+        let mut context = retry_context();
+        context.same_canonical_request = false;
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: false,
-                same_idempotency_key: false,
-            }),
+            contract.retry_after_unknown(context),
             RetryDecision::Denied
         );
     }
@@ -119,10 +127,7 @@ mod tests {
         );
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: true,
-                same_idempotency_key: false,
-            }),
+            contract.retry_after_unknown(retry_context()),
             RetryDecision::Allowed
         );
     }
@@ -133,21 +138,32 @@ mod tests {
             RetrySemantics::StableIdempotencyKeyRequired,
             OutcomeResolution::ProviderLookup,
         );
+        let mut context = retry_context();
+        context.same_idempotency_key = false;
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: true,
-                same_idempotency_key: false,
-            }),
+            contract.retry_after_unknown(context),
             RetryDecision::Denied
         );
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: true,
-                same_idempotency_key: true,
-            }),
+            contract.retry_after_unknown(retry_context()),
             RetryDecision::Allowed
+        );
+    }
+
+    #[test]
+    fn provider_idempotency_guarantee_must_still_apply() {
+        let contract = contract(
+            RetrySemantics::StableIdempotencyKeyRequired,
+            OutcomeResolution::ProviderLookup,
+        );
+        let mut context = retry_context();
+        context.provider_idempotency_guarantee_valid = false;
+
+        assert_eq!(
+            contract.retry_after_unknown(context),
+            RetryDecision::Denied
         );
     }
 
@@ -159,10 +175,7 @@ mod tests {
         );
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: true,
-                same_idempotency_key: false,
-            }),
+            contract.retry_after_unknown(retry_context()),
             RetryDecision::RequireReconciliation
         );
     }
@@ -175,10 +188,7 @@ mod tests {
         );
 
         assert_eq!(
-            contract.retry_after_unknown(RetryContext {
-                same_canonical_request: true,
-                same_idempotency_key: false,
-            }),
+            contract.retry_after_unknown(retry_context()),
             RetryDecision::Denied
         );
     }
