@@ -15,3 +15,6 @@
 - **INV-013 Effect declaration:** before execution, a protected effect declares mutation, retry, outcome-resolution, and recovery semantics.
 - **INV-014 In-doubt truth:** failed reconciliation that cannot prove either effect or no-effect enters `IN_DOUBT`; it is not converted to success, ordinary failure, or an automatic retry.
 - **INV-015 Idempotency scope:** reusing a provider idempotency key permits retry only for the identical canonical request and only while the adapter can establish that the provider's target-specific idempotency guarantee still applies.
+- **INV-016 Canonical identity:** approval identity is derived from deterministic canonical bytes of the complete proposed action, not caller-asserted canonical text.
+- **INV-017 Instance binding:** an approval for one action instance cannot authorize an otherwise identical action carrying a different action identifier.
+- **INV-018 Input-profile fail closed:** structured arguments outside CER's supported JCS/I-JSON profile cannot receive an approval fingerprint.

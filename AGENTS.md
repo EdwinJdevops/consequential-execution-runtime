@@ -3,13 +3,13 @@
 CER is a consequential-execution runtime. It is not an agent framework, IAM replacement, LLM evaluator, generic workflow engine, Terraform/Kubernetes policy product, or UI demo.
 
 ## Trust model
-Treat the autonomous caller, prompts, tool output, plugins/MCP servers, dependencies, and networks as untrusted. An LLM may propose an action but cannot establish authorization, target state, approval validity, retry safety, recovery capability, successful execution, or recovery completion.
+Treat the autonomous caller, prompts, tool output, plugins/MCP servers, dependencies, and networks as untrusted. An LLM may propose an action but cannot establish authorization, canonical identity, target state, approval validity, retry safety, recovery capability, successful execution, or recovery completion.
 
 CER is not an enforcement boundary while a protected caller retains an alternate credential/network path to mutate the target directly. A production boundary must own/broker downstream authority, require a CER-issued assertion enforced by the target, or use native admission that rejects mutations lacking valid CER authorization.
 
 ## Mandatory invariants
 1. No protected effect executes until required preconditions are satisfied.
-2. Approval binds exact action, target, canonical arguments, observed state, and policy context.
+2. Approval binds the exact canonical fingerprint of action instance, target, operation, arguments, observed state, and policy context.
 3. Material state change invalidates prior approval.
 4. Unknown remote outcome is never silently classified as failure.
 5. Non-idempotent EXECUTION_UNKNOWN actions are never blindly retried.
@@ -23,6 +23,8 @@ CER is not an enforcement boundary while a protected caller retains an alternate
 13. Every protected effect declares retry, outcome-resolution, and recovery semantics before execution.
 14. If reconciliation cannot prove effect or no-effect, execution enters IN_DOUBT rather than success or ordinary failure.
 15. Reusing a provider idempotency key authorizes retry only for the identical canonical request and only while the adapter can establish that the provider's target-specific idempotency guarantee still applies.
+16. Caller-supplied text is never trusted merely because it is labeled canonical.
+17. Inputs outside CER's supported JCS/I-JSON profile fail before approval fingerprinting.
 
 ## Engineering rules
 - Read relevant ADRs and threat model before semantic changes.
@@ -33,7 +35,9 @@ CER is not an enforcement boundary while a protected caller retains an alternate
 - Never expose a generic rollback guarantee.
 - Adapter retry/recovery claims require target-specific evidence and conformance tests.
 - Idempotency-key reuse alone is not evidence of retry safety; target scope and provider semantics matter.
+- Do not introduce a second canonicalization scheme for capabilities or receipts; bind them to the canonical action fingerprint.
+- The raw ingress parser remains security-critical until duplicate-key and source-level input-profile checks exist.
 - Prefer deterministic tests; use fault injection for partial failures.
-- Any new security-sensitive dependency needs explicit justification.
+- Any new security-sensitive dependency needs explicit justification in an ADR.
 - No unsafe Rust in core/adapters without an approved ADR.
-- Scope changes to state machine, trust boundary, recovery, delegation, persistence, or adapter contract require an ADR.
+- Scope changes to state machine, trust boundary, recovery, delegation, persistence, canonicalization, or adapter contract require an ADR.
