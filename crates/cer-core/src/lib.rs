@@ -3,6 +3,7 @@
 pub mod approval;
 pub mod effect;
 pub mod execution;
+pub mod identity;
 pub mod recovery;
 
 pub use approval::{ApprovalBinding, ProposedAction};
@@ -11,4 +12,5 @@ pub use effect::{
     RetryDecision, RetrySemantics,
 };
 pub use execution::{ExecutionState, TransitionError};
+pub use identity::{ActionFingerprint, FingerprintError};
 pub use recovery::RecoveryCapability;
