@@ -18,3 +18,5 @@
 - **INV-016 Canonical identity:** approval identity is derived from deterministic canonical bytes of the complete proposed action, not caller-asserted canonical text.
 - **INV-017 Instance binding:** an approval for one action instance cannot authorize an otherwise identical action carrying a different action identifier.
 - **INV-018 Input-profile fail closed:** structured arguments outside CER's supported JCS/I-JSON profile cannot receive an approval fingerprint.
+- **INV-019 Duplicate-key rejection:** untrusted raw JSON arguments with duplicate object member names are rejected before a proposed action can be fingerprinted.
+- **INV-020 Identity/execution consistency:** execution consumes the validated structured arguments represented by the approval fingerprint, not an independently reparsed raw payload.
