@@ -17,7 +17,7 @@ Execution authority; target resources; approval evidence; observed-state evidenc
 - remote effect followed by lost acknowledgement;
 - process crash around external commit;
 - network partition;
-- idempotency-key substitution or loss across retry;
+- idempotency-key substitution, loss, expired validity, or target-scope mismatch across retry;
 - incorrect adapter declaration of retry, reconciliation, or recovery semantics;
 - outcome that cannot be resolved after reconciliation attempts;
 - recovery evidence corruption/staleness;
@@ -26,4 +26,4 @@ Execution authority; target resources; approval evidence; observed-state evidenc
 - compromised control-plane administrator.
 
 ## Required adversarial tests over time
-Target substitution, argument substitution, stale-state approval, policy-version mismatch, replay, duplicate request, lost acknowledgement, unknown-result retry, idempotency-key substitution, unreconcilable unknown outcome, recovery-semantics mismatch, recovery failure, state change before recovery, delegation expansion, expired/revoked capability, and direct-bypass attempts once credential mediation exists.
+Target substitution, argument substitution, stale-state approval, policy-version mismatch, replay, duplicate request, lost acknowledgement, unknown-result retry, idempotency-key substitution, idempotency-scope mismatch, unreconcilable unknown outcome, recovery-semantics mismatch, recovery failure, state change before recovery, delegation expansion, expired/revoked capability, and direct-bypass attempts once credential mediation exists.
