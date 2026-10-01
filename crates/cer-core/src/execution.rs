@@ -13,6 +13,7 @@ pub enum ExecutionState {
     FailedBeforeEffect,
     ExecutionUnknown,
     Reconciling,
+    InDoubt,
     RecoveryRequired,
     ManualIntervention,
 }
@@ -44,8 +45,11 @@ impl ExecutionState {
                 | (Executing, ExecutionUnknown)
                 | (ExecutionUnknown, Reconciling)
                 | (Reconciling, Completed)
+                | (Reconciling, InDoubt)
                 | (Reconciling, RecoveryRequired)
                 | (Reconciling, ManualIntervention)
+                | (InDoubt, Reconciling)
+                | (InDoubt, ManualIntervention)
                 | (RecoveryRequired, Proposed)
                 | (RecoveryRequired, ManualIntervention)
         );
@@ -73,6 +77,19 @@ mod tests {
     fn unknown_requires_reconciliation() {
         let state = ExecutionState::Executing
             .transition(ExecutionState::ExecutionUnknown)
+            .unwrap();
+
+        assert!(state.transition(ExecutionState::Completed).is_err());
+        assert_eq!(
+            state.transition(ExecutionState::Reconciling).unwrap(),
+            ExecutionState::Reconciling
+        );
+    }
+
+    #[test]
+    fn unresolved_reconciliation_enters_in_doubt() {
+        let state = ExecutionState::Reconciling
+            .transition(ExecutionState::InDoubt)
             .unwrap();
 
         assert!(state.transition(ExecutionState::Completed).is_err());

@@ -1,3 +1,5 @@
+use crate::effect::RecoverySemantics;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecoveryCapability {
     DirectReversal,
@@ -15,6 +17,17 @@ impl RecoveryCapability {
             Self::SnapshotRestore { .. } | Self::Reconstruction { .. }
         )
     }
+
+    pub fn semantics(&self) -> RecoverySemantics {
+        match self {
+            Self::DirectReversal => RecoverySemantics::DirectReversal,
+            Self::CompensatingAction => RecoverySemantics::CompensatingAction,
+            Self::SnapshotRestore { .. } => RecoverySemantics::SnapshotRestore,
+            Self::Reconstruction { .. } => RecoverySemantics::Reconstruction,
+            Self::ExternalCompensation => RecoverySemantics::ExternalCompensation,
+            Self::NoRecovery => RecoverySemantics::Irreversible,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -24,6 +37,10 @@ mod tests {
     #[test]
     fn no_recovery_is_explicit() {
         assert!(!RecoveryCapability::NoRecovery.requires_prepared_evidence());
+        assert_eq!(
+            RecoveryCapability::NoRecovery.semantics(),
+            RecoverySemantics::Irreversible
+        );
     }
 
     #[test]
