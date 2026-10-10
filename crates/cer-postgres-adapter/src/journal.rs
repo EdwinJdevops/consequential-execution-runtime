@@ -42,6 +42,7 @@ pub fn admit(
 pub const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS cer_operation_journal (\
     operation_id TEXT PRIMARY KEY, \
     fingerprint TEXT NOT NULL, \
+    evidence_reference TEXT, \
     status TEXT NOT NULL CHECK (status IN ('PENDING', 'EXECUTING', 'UNKNOWN', 'SUCCEEDED', 'FAILED'))\
 )";
 
@@ -95,9 +96,8 @@ pub fn reconcile(
         return Ok(Reconciliation::NotEligible);
     }
     let changed = client.execute(
-        "UPDATE cer_operation_journal SET status = $2 \
-         WHERE operation_id = $1 AND status IN ('EXECUTING', 'UNKNOWN') \
-         AND length($3::text) > 0",
+        "UPDATE cer_operation_journal SET status = $2, evidence_reference = $3 \
+         WHERE operation_id = $1 AND status IN ('EXECUTING', 'UNKNOWN')",
         &[&operation_id, &verified_status, &evidence_reference],
     )?;
     Ok(if changed == 1 {
