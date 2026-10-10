@@ -23,7 +23,8 @@ pub fn execute_atomic(
     action: &ProposedAction,
     fresh_state: &str,
 ) -> Result<AtomicOutcome, Box<dyn std::error::Error>> {
-    if revalidate(ExecutionState::Revalidating, approval, action, fresh_state).is_err() {
+    // Approval identity must match before any durable lookup or mutation.
+    if !approval.matches(action)? {
         return Ok(AtomicOutcome::Rejected);
     }
     let fingerprint = action
@@ -54,6 +55,11 @@ pub fn execute_atomic(
         } else {
             AtomicOutcome::ExistingUnresolved
         });
+    }
+    // Existing operation identities are resolved above, even when the original
+    // observation is now stale after a successful commit.
+    if revalidate(ExecutionState::Revalidating, approval, action, fresh_state).is_err() {
+        return Ok(AtomicOutcome::Rejected);
     }
     let expected = match fresh_state.parse::<i64>() {
         Ok(version) => version,
