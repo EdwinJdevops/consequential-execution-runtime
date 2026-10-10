@@ -79,6 +79,10 @@ pub fn execute_atomic(
             return Ok(AtomicOutcome::StateChanged);
         }
     };
+    // Avoid overflowing the version counter before any resource write.
+    let Some(next_version) = expected.checked_add(1) else {
+        return Ok(AtomicOutcome::StateChanged);
+    };
     let changed = tx.execute(
         "UPDATE cer_resources SET payload = $3::text::jsonb,
          version = version + 1, last_operation_id = $4
@@ -90,6 +94,20 @@ pub fn execute_atomic(
             &action.action_id,
         ],
     )?;
+    if changed == 1 {
+        tx.execute(
+            "INSERT INTO cer_postgres_effects
+             (operation_id, fingerprint, resource_id, version_before, version_after)
+             VALUES ($1, $2, $3, $4, $5)",
+            &[
+                &action.action_id,
+                &fingerprint,
+                &action.resource_id,
+                &expected,
+                &next_version,
+            ],
+        )?;
+    }
     let status = if changed == 1 { "SUCCEEDED" } else { "FAILED" };
     tx.execute(
         "UPDATE cer_operation_journal SET status = $2
