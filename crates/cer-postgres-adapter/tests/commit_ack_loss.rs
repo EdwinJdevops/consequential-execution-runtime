@@ -126,6 +126,9 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         while let Ok((kind, frame)) = packet(&mut downstream) {
             // postgres may issue COMMIT through extended Parse/Bind/Execute/Sync,
             // rather than a simple Query message.
+            if kind == b'Q' || kind == b'P' {
+                eprintln!("frontend sql kind={} bytes={:?}", kind, &frame[5..]);
+            }
             let commit = (kind == b'Q' || kind == b'P')
                 && frame[5..].windows(6).any(|bytes| bytes == b"COMMIT");
             if commit {
