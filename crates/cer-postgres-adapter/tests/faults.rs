@@ -186,3 +186,101 @@ fn simultaneous_workers_mutate_once() {
     db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
         .unwrap();
 }
+
+#[test]
+fn unsupported_operation_cannot_mutate_or_consume_identity() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("unsupported-{}", std::process::id());
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    setup(&mut db);
+    db.execute(
+        "INSERT INTO cer_resources (resource_id, version, payload)
+         VALUES ($1, 3, '{}'::jsonb)",
+        &[&id],
+    )
+    .unwrap();
+    let mut a = action(&id, &id);
+    a.operation = "delete".into();
+    let approval = ApprovalBinding::bind(&a).unwrap();
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, "3").unwrap(),
+        AtomicOutcome::UnsupportedOperation
+    );
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &a).unwrap(),
+        DurableOutcome::Absent
+    );
+    let version: i64 = db
+        .query_one(
+            "SELECT version FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(version, 3);
+    db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
+
+#[test]
+fn independent_operations_on_same_version_cannot_both_succeed() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("race-{}", std::process::id());
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    setup(&mut db);
+    db.execute(
+        "INSERT INTO cer_resources (resource_id, version, payload)
+         VALUES ($1, 3, '{}'::jsonb)",
+        &[&id],
+    )
+    .unwrap();
+    drop(db);
+    let barrier = Arc::new(Barrier::new(2));
+    let handles: Vec<_> = (0..2)
+        .map(|n| {
+            let url = url.clone();
+            let resource = id.clone();
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                let a = action(&format!("{resource}-op-{n}"), &resource);
+                let approval = ApprovalBinding::bind(&a).unwrap();
+                let mut db = Client::connect(&url, NoTls).unwrap();
+                barrier.wait();
+                execute_atomic(&mut db, &approval, &a, "3").unwrap()
+            })
+        })
+        .collect();
+    let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    assert_eq!(
+        outcomes.iter().filter(|o| **o == AtomicOutcome::Applied).count(),
+        1
+    );
+    assert_eq!(
+        outcomes.iter().filter(|o| **o == AtomicOutcome::StateChanged).count(),
+        1
+    );
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    let version: i64 = db
+        .query_one(
+            "SELECT version FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(version, 4);
+    for n in 0..2 {
+        db.execute(
+            "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+            &[&format!("{id}-op-{n}")],
+        )
+        .unwrap();
+    }
+    db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
