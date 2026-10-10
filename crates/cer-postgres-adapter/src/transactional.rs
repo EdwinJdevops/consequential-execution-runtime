@@ -157,7 +157,31 @@ pub fn inspect_durable_outcome(
         DurableOutcome::IdentityConflict
     } else {
         match status.as_str() {
-            "SUCCEEDED" => DurableOutcome::Succeeded,
+            "SUCCEEDED" => {
+                let row = client.query_opt(
+                    "SELECT fingerprint, resource_id, version_before, version_after
+                     FROM cer_postgres_effects WHERE operation_id = $1",
+                    &[&action.action_id],
+                )?;
+                match row {
+                    Some(effect) => {
+                        let effect_fingerprint: String = effect.get(0);
+                        let resource_id: String = effect.get(1);
+                        let before: i64 = effect.get(2);
+                        let after: i64 = effect.get(3);
+                        if effect_fingerprint == fingerprint
+                            && resource_id == action.resource_id
+                            && before.checked_add(1) == Some(after)
+                            && action.observed_state.parse::<i64>().ok() == Some(before)
+                        {
+                            DurableOutcome::Succeeded
+                        } else {
+                            DurableOutcome::EvidenceMismatch
+                        }
+                    }
+                    None => DurableOutcome::EvidenceMismatch,
+                }
+            },
             "FAILED" => DurableOutcome::Failed,
             _ => DurableOutcome::Unresolved,
         }
