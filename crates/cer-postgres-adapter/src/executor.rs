@@ -19,7 +19,9 @@ pub enum JournaledOutcome {
 
 /// Executes at most one attempt for an operation identity. Database errors
 /// propagate; callers must not treat those errors as evidence of no effect.
-#[deprecated(note = "Non-atomic journal and target connections; use transactional::execute_atomic for PostgreSQL-owned effects")]
+#[deprecated(
+    note = "Non-atomic journal and target connections; use transactional::execute_atomic for PostgreSQL-owned effects"
+)]
 pub fn execute_once(
     journal: &mut Client,
     target: &mut crate::PostgresTarget,
