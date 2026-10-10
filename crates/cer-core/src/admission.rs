@@ -21,18 +21,27 @@ pub fn revalidate(
     if state != ExecutionState::Revalidating {
         return Err(AdmissionError::InvalidState);
     }
-    if !approved.matches(proposed).map_err(|_| AdmissionError::ApprovalMismatch)? {
+    if !approved
+        .matches(proposed)
+        .map_err(|_| AdmissionError::ApprovalMismatch)?
+    {
         return Err(AdmissionError::ApprovalMismatch);
     }
     if proposed.observed_state != fresh_state {
         return Err(AdmissionError::StateChanged);
     }
-    Ok(Revalidated { fingerprint: proposed.fingerprint().map_err(|_| AdmissionError::ApprovalMismatch)? })
+    Ok(Revalidated {
+        fingerprint: proposed
+            .fingerprint()
+            .map_err(|_| AdmissionError::ApprovalMismatch)?,
+    })
 }
 
 impl Revalidated {
     pub fn matches_action(&self, action: &ProposedAction) -> bool {
-        action.fingerprint().is_ok_and(|fingerprint| fingerprint == self.fingerprint)
+        action
+            .fingerprint()
+            .is_ok_and(|fingerprint| fingerprint == self.fingerprint)
     }
 }
 
@@ -65,7 +74,10 @@ mod tests {
     fn stale_state_blocks() {
         let a = action();
         let approval = ApprovalBinding::bind(&a).unwrap();
-        assert_eq!(revalidate(ExecutionState::Revalidating, &approval, &a, "v2"), Err(AdmissionError::StateChanged));
+        assert_eq!(
+            revalidate(ExecutionState::Revalidating, &approval, &a, "v2"),
+            Err(AdmissionError::StateChanged)
+        );
     }
 
     #[test]
@@ -74,13 +86,19 @@ mod tests {
         let approval = ApprovalBinding::bind(&a).unwrap();
         let mut changed = a;
         changed.resource_id = "db/other".into();
-        assert_eq!(revalidate(ExecutionState::Revalidating, &approval, &changed, "v1"), Err(AdmissionError::ApprovalMismatch));
+        assert_eq!(
+            revalidate(ExecutionState::Revalidating, &approval, &changed, "v1"),
+            Err(AdmissionError::ApprovalMismatch)
+        );
     }
 
     #[test]
     fn unauthorized_state_blocks() {
         let a = action();
         let approval = ApprovalBinding::bind(&a).unwrap();
-        assert_eq!(revalidate(ExecutionState::Proposed, &approval, &a, "v1"), Err(AdmissionError::InvalidState));
+        assert_eq!(
+            revalidate(ExecutionState::Proposed, &approval, &a, "v1"),
+            Err(AdmissionError::InvalidState)
+        );
     }
 }
