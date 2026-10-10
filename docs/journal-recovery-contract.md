@@ -26,3 +26,7 @@ For new databases, provision `journal::SCHEMA` once using a controlled migration
 ## Production gate
 
 The implementation is **not production-ready**. Required before AWS mutations: independent evidence verification; crash-window fault injection including lost commit acknowledgement; authorization of reconciliation; operational audit; and a scoped AWS integration test with explicit cost and permission boundaries.
+
+## Read-only PostgreSQL observation
+
+`observation::observe` compares the authoritative resource version and JSON payload against the proposed effect. `ConsistentWithEffect` means only that the state matches; it **does not establish that CER caused the change**. `NotObserved` is not proof the effect never happened (it could have been reverted). `Inconclusive` requires investigation. None of these observations authorizes an automatic terminal reconciliation. Reliable attribution requires a durable operation marker committed atomically with the resource mutation or a provider-issued operation identifier.
