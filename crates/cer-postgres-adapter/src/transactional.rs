@@ -10,6 +10,7 @@ pub enum AtomicOutcome {
     Rejected,
     AlreadyApplied,
     ExistingFailed,
+    ExistingUnresolved,
     IdentityConflict,
 }
 
@@ -48,8 +49,10 @@ pub fn execute_atomic(
             AtomicOutcome::IdentityConflict
         } else if status == "SUCCEEDED" {
             AtomicOutcome::AlreadyApplied
-        } else {
+        } else if status == "FAILED" {
             AtomicOutcome::ExistingFailed
+        } else {
+            AtomicOutcome::ExistingUnresolved
         });
     }
     let expected = match fresh_state.parse::<i64>() {
@@ -86,5 +89,46 @@ pub fn execute_atomic(
         AtomicOutcome::Applied
     } else {
         AtomicOutcome::StateChanged
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurableOutcome {
+    Absent,
+    Succeeded,
+    Failed,
+    Unresolved,
+    IdentityConflict,
+}
+
+/// Authoritative recovery read after a disconnected or uncertain COMMIT.
+/// Never interprets a missing row as proof that no external effect occurred.
+pub fn inspect_durable_outcome(
+    client: &mut Client,
+    action: &ProposedAction,
+) -> Result<DurableOutcome, Box<dyn std::error::Error>> {
+    let fingerprint = action
+        .fingerprint()?
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let row = client.query_opt(
+        "SELECT fingerprint, status FROM cer_operation_journal WHERE operation_id = $1",
+        &[&action.action_id],
+    )?;
+    let Some(row) = row else {
+        return Ok(DurableOutcome::Absent);
+    };
+    let stored: String = row.get(0);
+    let status: String = row.get(1);
+    Ok(if stored != fingerprint {
+        DurableOutcome::IdentityConflict
+    } else {
+        match status.as_str() {
+            "SUCCEEDED" => DurableOutcome::Succeeded,
+            "FAILED" => DurableOutcome::Failed,
+            _ => DurableOutcome::Unresolved,
+        }
     })
 }
