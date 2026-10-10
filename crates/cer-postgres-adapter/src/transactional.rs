@@ -124,6 +124,7 @@ pub fn execute_atomic(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DurableOutcome {
+    EvidenceMismatch,
     Absent,
     Succeeded,
     Failed,
