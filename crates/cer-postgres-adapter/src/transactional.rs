@@ -181,7 +181,7 @@ pub fn inspect_durable_outcome(
                     }
                     None => DurableOutcome::EvidenceMismatch,
                 }
-            },
+            }
             "FAILED" => DurableOutcome::Failed,
             _ => DurableOutcome::Unresolved,
         }
