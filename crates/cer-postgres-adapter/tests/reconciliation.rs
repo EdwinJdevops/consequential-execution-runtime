@@ -15,14 +15,8 @@ fn reconciliation_requires_evidence_and_preserves_terminal_outcome() {
     let mut db = Client::connect(&url, NoTls).unwrap();
     db.batch_execute(SCHEMA).unwrap();
     let id = format!("reconcile-{}", std::process::id());
-    assert_eq!(
-        admit(&mut db, &id, "fingerprint").unwrap(),
-        Admission::New
-    );
-    assert_eq!(
-        claim(&mut db, &id, "fingerprint").unwrap(),
-        Claim::Claimed
-    );
+    assert_eq!(admit(&mut db, &id, "fingerprint").unwrap(), Admission::New);
+    assert_eq!(claim(&mut db, &id, "fingerprint").unwrap(), Claim::Claimed);
     assert!(mark_unknown(&mut db, &id).unwrap());
     assert_eq!(
         reconcile(&mut db, &id, "SUCCEEDED", "").unwrap(),
