@@ -122,12 +122,19 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
             }
         });
 
+        let mut commit_pending = false;
         while let Ok((kind, frame)) = packet(&mut downstream) {
-            let commit = kind == b'Q' && frame[5..].starts_with(b"COMMIT");
+            // postgres may issue COMMIT through extended Parse/Bind/Execute/Sync,
+            // rather than a simple Query message.
+            let commit = (kind == b'Q' || kind == b'P')
+                && frame[5..].windows(6).any(|bytes| bytes == b"COMMIT");
             if commit {
+                commit_pending = true;
                 commit_forwarded.store(true, Ordering::SeqCst);
             }
-            if upstream.write_all(&frame).is_err() || commit {
+            if upstream.write_all(&frame).is_err()
+                || (commit_pending && (kind == b'S' || kind == b'Q'))
+            {
                 break;
             }
         }
