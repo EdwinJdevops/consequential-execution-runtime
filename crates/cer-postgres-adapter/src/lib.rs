@@ -1,6 +1,6 @@
-pub mod journal;
-
 #![forbid(unsafe_code)]
+
+pub mod journal;
 
 use cer_core::{ConditionalOutcome, ConditionalTarget, ProposedAction};
 use postgres::Client;
