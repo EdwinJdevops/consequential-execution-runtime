@@ -408,3 +408,74 @@ fn failed_version_compare_is_durable_and_not_retried() {
     db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
         .unwrap();
 }
+
+#[test]
+fn backend_termination_before_commit_rolls_back_all_effects() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("terminated-{}", std::process::id());
+    let a = action(&id, &id);
+    let approval = ApprovalBinding::bind(&a).unwrap();
+    let mut worker = Client::connect(&url, NoTls).unwrap();
+    setup(&mut worker);
+    worker
+        .execute(
+            "INSERT INTO cer_resources (resource_id, version, payload)
+             VALUES ($1, 3, '{}'::jsonb)",
+            &[&id],
+        )
+        .unwrap();
+    let pid: i32 = worker.query_one("SELECT pg_backend_pid()", &[]).unwrap().get(0);
+    let mut tx = worker.transaction().unwrap();
+    tx.execute(
+        "INSERT INTO cer_operation_journal (operation_id, fingerprint, status)
+         VALUES ($1, 'interrupted', 'PENDING')",
+        &[&id],
+    )
+    .unwrap();
+    tx.execute(
+        "UPDATE cer_resources SET version = 4 WHERE resource_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    let mut controller = Client::connect(&url, NoTls).unwrap();
+    let terminated: bool = controller
+        .query_one("SELECT pg_terminate_backend($1)", &[&pid])
+        .unwrap()
+        .get(0);
+    assert!(terminated);
+    assert!(tx.commit().is_err());
+    drop(worker);
+    let mut recovered = Client::connect(&url, NoTls).unwrap();
+    assert_eq!(
+        inspect_durable_outcome(&mut recovered, &a).unwrap(),
+        DurableOutcome::Absent
+    );
+    let version: i64 = recovered
+        .query_one(
+            "SELECT version FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(version, 3);
+    assert_eq!(
+        execute_atomic(&mut recovered, &approval, &a, "3").unwrap(),
+        AtomicOutcome::Applied
+    );
+    assert_eq!(
+        inspect_durable_outcome(&mut recovered, &a).unwrap(),
+        DurableOutcome::Succeeded
+    );
+    recovered
+        .execute(
+            "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+            &[&id],
+        )
+        .unwrap();
+    recovered
+        .execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
