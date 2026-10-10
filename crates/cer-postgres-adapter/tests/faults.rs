@@ -427,7 +427,10 @@ fn backend_termination_before_commit_rolls_back_all_effects() {
             &[&id],
         )
         .unwrap();
-    let pid: i32 = worker.query_one("SELECT pg_backend_pid()", &[]).unwrap().get(0);
+    let pid: i32 = worker
+        .query_one("SELECT pg_backend_pid()", &[])
+        .unwrap()
+        .get(0);
     let mut tx = worker.transaction().unwrap();
     tx.execute(
         "INSERT INTO cer_operation_journal (operation_id, fingerprint, status)
