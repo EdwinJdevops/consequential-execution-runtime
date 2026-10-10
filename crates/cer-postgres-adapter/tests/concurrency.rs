@@ -17,11 +17,12 @@ fn competing_writers_cannot_both_commit_same_version() {
     )
     .unwrap();
     let id = format!("cer-concurrency-{}", std::process::id());
-    admin.execute(
-        "INSERT INTO cer_resources(resource_id, version, payload) VALUES ($1, 1, '{}'::jsonb)",
-        &[&id],
-    )
-    .unwrap();
+    admin
+        .execute(
+            "INSERT INTO cer_resources(resource_id, version, payload) VALUES ($1, 1, '{}'::jsonb)",
+            &[&id],
+        )
+        .unwrap();
     let barrier = Arc::new(Barrier::new(3));
     let mut handles = Vec::new();
     for _ in 0..2 {
@@ -44,10 +45,32 @@ fn competing_writers_cannot_both_commit_same_version() {
         }));
     }
     barrier.wait();
-    let outcomes: Vec<_> = handles.into_iter().map(|handle| handle.join().unwrap()).collect();
-    assert_eq!(outcomes.iter().filter(|outcome| **outcome == ConditionalOutcome::Applied).count(), 1);
-    assert_eq!(outcomes.iter().filter(|outcome| **outcome == ConditionalOutcome::StateChanged).count(), 1);
-    let row = admin.query_one("SELECT version FROM cer_resources WHERE resource_id = $1", &[&id]).unwrap();
+    let outcomes: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .collect();
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == ConditionalOutcome::Applied)
+            .count(),
+        1
+    );
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == ConditionalOutcome::StateChanged)
+            .count(),
+        1
+    );
+    let row = admin
+        .query_one(
+            "SELECT version FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap();
     assert_eq!(row.get::<_, i64>(0), 2);
-    admin.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id]).unwrap();
+    admin
+        .execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
 }
