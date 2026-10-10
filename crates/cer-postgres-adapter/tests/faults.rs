@@ -6,7 +6,8 @@ use postgres::{Client, NoTls};
 use std::sync::{Arc, Barrier};
 
 fn setup(db: &mut Client) {
-    db.batch_execute("SELECT pg_advisory_lock(72451639);").unwrap();
+    db.batch_execute("SELECT pg_advisory_lock(72451639);")
+        .unwrap();
     db.batch_execute(
         "CREATE TABLE IF NOT EXISTS cer_resources (
             resource_id TEXT PRIMARY KEY, version BIGINT NOT NULL, payload JSONB NOT NULL
@@ -20,7 +21,8 @@ fn setup(db: &mut Client) {
         "../migrations/0004_atomic_effect_evidence.sql"
     ))
     .unwrap();
-    db.batch_execute("SELECT pg_advisory_unlock(72451639);").unwrap();
+    db.batch_execute("SELECT pg_advisory_unlock(72451639);")
+        .unwrap();
 }
 
 fn action(id: &str, resource: &str) -> ProposedAction {
