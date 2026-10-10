@@ -4,15 +4,24 @@ use postgres::{Client, NoTls};
 #[test]
 fn disconnect_after_claim_does_not_allow_reexecution() {
     let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
-        assert!(std::env::var("CI").is_err(), "CI must provide CER_TEST_DATABASE_URL");
+        assert!(
+            std::env::var("CI").is_err(),
+            "CI must provide CER_TEST_DATABASE_URL"
+        );
         return;
     };
     let id = format!("crash-{}", std::process::id());
     {
         let mut first = Client::connect(&url, NoTls).unwrap();
         first.batch_execute(SCHEMA).unwrap();
-        assert_eq!(admit(&mut first, &id, "fingerprint").unwrap(), Admission::New);
-        assert_eq!(claim(&mut first, &id, "fingerprint").unwrap(), Claim::Claimed);
+        assert_eq!(
+            admit(&mut first, &id, "fingerprint").unwrap(),
+            Admission::New
+        );
+        assert_eq!(
+            claim(&mut first, &id, "fingerprint").unwrap(),
+            Claim::Claimed
+        );
         // Simulate a process crash after the durable claim, before recording an outcome.
     }
     let mut recovered = Client::connect(&url, NoTls).unwrap();
