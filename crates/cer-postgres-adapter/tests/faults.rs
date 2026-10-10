@@ -155,7 +155,13 @@ fn simultaneous_workers_mutate_once() {
         })
         .collect();
     let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-    assert_eq!(outcomes.iter().filter(|x| **x == AtomicOutcome::Applied).count(), 1);
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|x| **x == AtomicOutcome::Applied)
+            .count(),
+        1
+    );
     assert_eq!(
         outcomes
             .iter()
