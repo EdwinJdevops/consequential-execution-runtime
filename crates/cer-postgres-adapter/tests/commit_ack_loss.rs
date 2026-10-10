@@ -150,7 +150,14 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         let _ = downstream.shutdown(Shutdown::Both);
     });
 
-    let mut config: postgres::Config = url.parse().unwrap();
+    let base: postgres::Config = url.parse().unwrap();
+    // Adding a host to a parsed config appends it; it does not replace the
+    // original host. Build a fresh config to guarantee the proxy is used.
+    let mut config = postgres::Config::new();
+    config
+        .user(base.get_user().unwrap())
+        .password(base.get_password().unwrap())
+        .dbname(base.get_dbname().unwrap());
     config
         .ssl_mode(postgres::config::SslMode::Disable)
         .host("127.0.0.1")
