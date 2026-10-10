@@ -1,6 +1,8 @@
 //! Journal-gated execution. An existing or unclaimable operation is never retried.
 use crate::journal::{admit, claim, mark_unknown, Admission, Claim};
-use cer_core::{execute_conditionally, ApprovalBinding, CoordinatedOutcome, ExecutionState, ProposedAction};
+use cer_core::{
+    execute_conditionally, ApprovalBinding, CoordinatedOutcome, ExecutionState, ProposedAction,
+};
 use postgres::{Client, Error};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
