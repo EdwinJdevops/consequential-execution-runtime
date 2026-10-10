@@ -29,13 +29,32 @@ fn concurrent_duplicate_admission_and_conflicting_intent() {
         .into_iter()
         .map(|handle| handle.join().unwrap())
         .collect();
-    assert_eq!(outcomes.iter().filter(|outcome| **outcome == Admission::New).count(), 1);
-    assert_eq!(outcomes.iter().filter(|outcome| **outcome == Admission::Existing).count(), 1);
-    assert_eq!(admit(&mut admin, &id, "fingerprint-B").unwrap(), Admission::Conflict);
-    let row = admin.query_one(
-        "SELECT count(*) FROM cer_operation_journal WHERE operation_id = $1",
-        &[&id],
-    ).unwrap();
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == Admission::New)
+            .count(),
+        1
+    );
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == Admission::Existing)
+            .count(),
+        1
+    );
+    assert_eq!(
+        admit(&mut admin, &id, "fingerprint-B").unwrap(),
+        Admission::Conflict
+    );
+    let row = admin
+        .query_one(
+            "SELECT count(*) FROM cer_operation_journal WHERE operation_id = $1",
+            &[&id],
+        )
+        .unwrap();
     assert_eq!(row.get::<_, i64>(0), 1);
-    admin.execute("DELETE FROM cer_operation_journal WHERE operation_id = $1", &[&id]).unwrap();
+    admin
+        .execute("DELETE FROM cer_operation_journal WHERE operation_id = $1", &[&id])
+        .unwrap();
 }
