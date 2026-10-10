@@ -16,6 +16,29 @@ pub enum AtomicOutcome {
     EvidenceMismatch,
 }
 
+fn evidence_matches(
+    client: &mut postgres::Transaction<'_>,
+    action: &ProposedAction,
+    fingerprint: &str,
+) -> Result<bool, postgres::Error> {
+    let row = client.query_opt(
+        "SELECT fingerprint, resource_id, version_before, version_after
+         FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&action.action_id],
+    )?;
+    let Some(row) = row else {
+        return Ok(false);
+    };
+    let stored: String = row.get(0);
+    let resource: String = row.get(1);
+    let before: i64 = row.get(2);
+    let after: i64 = row.get(3);
+    Ok(stored == fingerprint
+        && resource == action.resource_id
+        && before.checked_add(1) == Some(after)
+        && action.observed_state.parse::<i64>().ok() == Some(before))
+}
+
 /// Performs one version-checked PostgreSQL mutation with a durable journal
 /// outcome in the SAME transaction. A failed COMMIT is ambiguous to its caller:
 /// reconnect and inspect the journal before deciding what happened.
@@ -56,7 +79,11 @@ pub fn execute_atomic(
         return Ok(if existing != fingerprint {
             AtomicOutcome::IdentityConflict
         } else if status == "SUCCEEDED" {
-            AtomicOutcome::AlreadyApplied
+            if evidence_matches(&mut tx, action, &fingerprint)? {
+                AtomicOutcome::AlreadyApplied
+            } else {
+                AtomicOutcome::EvidenceMismatch
+            }
         } else if status == "FAILED" {
             AtomicOutcome::ExistingFailed
         } else {
