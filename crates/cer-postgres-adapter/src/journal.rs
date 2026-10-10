@@ -76,3 +76,33 @@ pub fn mark_unknown(client: &mut Client, operation_id: &str) -> Result<bool, Err
     )?;
     Ok(changed == 1)
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reconciliation {
+    Recorded,
+    NotEligible,
+}
+
+/// Records an externally verified outcome. The caller must establish evidence
+/// from the actual target system; this function does not verify that evidence.
+pub fn reconcile(
+    client: &mut Client,
+    operation_id: &str,
+    verified_status: &str,
+    evidence_reference: &str,
+) -> Result<Reconciliation, Error> {
+    if !matches!(verified_status, "SUCCEEDED" | "FAILED") || evidence_reference.is_empty() {
+        return Ok(Reconciliation::NotEligible);
+    }
+    let changed = client.execute(
+        "UPDATE cer_operation_journal SET status = $2 \
+         WHERE operation_id = $1 AND status IN ('EXECUTING', 'UNKNOWN') \
+         AND length($3::text) > 0",
+        &[&operation_id, &verified_status, &evidence_reference],
+    )?;
+    Ok(if changed == 1 {
+        Reconciliation::Recorded
+    } else {
+        Reconciliation::NotEligible
+    })
+}
