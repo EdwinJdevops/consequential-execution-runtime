@@ -29,6 +29,8 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         "../migrations/0004_atomic_effect_evidence.sql"
     ))
     .unwrap();
+    db.batch_execute(include_str!("../migrations/0005_revoke_public_access.sql"))
+        .unwrap();
     db.batch_execute("SELECT pg_advisory_unlock(72451639);")
         .unwrap();
     let id = format!("atomic-{}", std::process::id());
