@@ -1,4 +1,4 @@
-//! Wire-level lost-COMMIT-ack regression against PostgreSQL's simple-query protocol.
+//! Wire-level lost-COMMIT-ack regression against PostgreSQL's frontend/backend protocol.
 //! Proxy suppresses the backend's COMMIT response after forwarding the request.
 use cer_core::{ActionArguments, ApprovalBinding, ProposedAction};
 use cer_postgres_adapter::transactional::{
@@ -131,9 +131,6 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         while let Ok((kind, frame)) = packet(&mut downstream) {
             // postgres may issue COMMIT through extended Parse/Bind/Execute/Sync,
             // rather than a simple Query message.
-            if kind == b'Q' || kind == b'P' {
-                eprintln!("frontend sql kind={} bytes={:?}", kind, &frame[5..]);
-            }
             let commit = (kind == b'Q' || kind == b'P')
                 && frame[5..].windows(6).any(|bytes| bytes == b"COMMIT");
             if commit {
@@ -163,16 +160,10 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         .host("127.0.0.1")
         .port(port)
         .connect_timeout(std::time::Duration::from_secs(5));
-    eprintln!("fault test: connecting through proxy");
     let mut worker = config.connect(NoTls).unwrap();
-    eprintln!("fault test: proxy connected");
-    eprintln!("fault test: executing atomic operation");
     let result = execute_atomic(&mut worker, &approval, &action, "3");
-    eprintln!("fault test: atomic returned {result:?}");
     drop(worker);
-    eprintln!("fault test: joining proxy");
     proxy.join().unwrap();
-    eprintln!("fault test: proxy joined");
     assert!(
         result.is_err(),
         "worker must not receive COMMIT acknowledgment: {result:?}"
