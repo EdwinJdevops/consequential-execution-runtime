@@ -35,7 +35,11 @@ impl ConditionalTarget for PostgresTarget {
         let row = self.client.query_opt(
             "UPDATE cer_resources SET payload = $3::jsonb, version = version + 1 \
              WHERE resource_id = $1 AND version = $2 RETURNING version",
-            &[&action.resource_id, &expected_version, &action.arguments.as_value().to_string()],
+            &[
+                &action.resource_id,
+                &expected_version,
+                &action.arguments.as_value().to_string(),
+            ],
         )?;
         Ok(if row.is_some() {
             ConditionalOutcome::Applied
