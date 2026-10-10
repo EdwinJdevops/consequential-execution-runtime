@@ -45,7 +45,7 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
     drop(db);
     let mut db = Client::connect(&url, NoTls).unwrap();
     assert_eq!(
-        execute_atomic(&mut db, &approval, &action, "3").unwrap(),
+        execute_atomic(&mut db, &approval, &action, "4").unwrap(),
         AtomicOutcome::AlreadyApplied
     );
     let row = db
@@ -60,7 +60,7 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
     conflicting.arguments = ActionArguments::from_json_str(r#"{"value":2}"#).unwrap();
     let other_approval = ApprovalBinding::bind(&conflicting).unwrap();
     assert_eq!(
-        execute_atomic(&mut db, &other_approval, &conflicting, "3").unwrap(),
+        execute_atomic(&mut db, &other_approval, &conflicting, "4").unwrap(),
         AtomicOutcome::IdentityConflict
     );
     db.execute(
