@@ -12,6 +12,7 @@ pub enum AtomicOutcome {
     ExistingFailed,
     ExistingUnresolved,
     IdentityConflict,
+    UnsupportedOperation,
 }
 
 /// Performs one version-checked PostgreSQL mutation with a durable journal
@@ -26,6 +27,11 @@ pub fn execute_atomic(
     // Approval identity must match before any durable lookup or mutation.
     if !approval.matches(action)? {
         return Ok(AtomicOutcome::Rejected);
+    }
+    // The PostgreSQL adapter supports exactly one mutation semantic.
+    // Never interpret arbitrary action operation labels as a resource update.
+    if action.operation != "update" {
+        return Ok(AtomicOutcome::UnsupportedOperation);
     }
     let fingerprint = action
         .fingerprint()?
