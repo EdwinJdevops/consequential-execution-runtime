@@ -156,10 +156,16 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         .host("127.0.0.1")
         .port(port)
         .connect_timeout(std::time::Duration::from_secs(5));
+    eprintln!("fault test: connecting through proxy");
     let mut worker = config.connect(NoTls).unwrap();
+    eprintln!("fault test: proxy connected");
+    eprintln!("fault test: executing atomic operation");
     let result = execute_atomic(&mut worker, &approval, &action, "3");
+    eprintln!("fault test: atomic returned {result:?}");
     drop(worker);
+    eprintln!("fault test: joining proxy");
     proxy.join().unwrap();
+    eprintln!("fault test: proxy joined");
     assert!(
         result.is_err(),
         "worker must not receive COMMIT acknowledgment: {result:?}"
