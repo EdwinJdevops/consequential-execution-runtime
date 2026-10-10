@@ -1,7 +1,7 @@
 //! Atomic execution for PostgreSQL-owned resources only.
 //! The operation journal and resource mutation share one database transaction.
 use cer_core::{revalidate, ApprovalBinding, ExecutionState, ProposedAction};
-use postgres::{Client, Error};
+use postgres::Client;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AtomicOutcome {
