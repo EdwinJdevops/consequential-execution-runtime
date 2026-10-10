@@ -85,6 +85,11 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
     let suppressed_proxy = Arc::clone(&suppressed);
     let proxy = thread::spawn(move || {
         let (mut downstream, _) = listener.accept().unwrap();
+        let watchdog_socket = downstream.try_clone().unwrap();
+        thread::spawn(move || {
+            thread::sleep(std::time::Duration::from_secs(8));
+            let _ = watchdog_socket.shutdown(Shutdown::Both);
+        });
         downstream
             .set_read_timeout(Some(std::time::Duration::from_secs(15)))
             .unwrap();
