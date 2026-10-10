@@ -1,5 +1,7 @@
 use cer_core::{ActionArguments, ApprovalBinding, ProposedAction};
-use cer_postgres_adapter::transactional::{execute_atomic, AtomicOutcome};
+use cer_postgres_adapter::transactional::{
+    execute_atomic, inspect_durable_outcome, AtomicOutcome, DurableOutcome,
+};
 use postgres::{Client, NoTls};
 
 #[test]
@@ -64,6 +66,20 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         .unwrap();
     assert_eq!(row.get::<_, i64>(0), 4);
     assert_eq!(row.get::<_, String>(1), id);
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &action).unwrap(),
+        DurableOutcome::Succeeded
+    );
+    db.execute(
+        "UPDATE cer_postgres_effects SET fingerprint = 'corrupt'
+         WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &action).unwrap(),
+        DurableOutcome::EvidenceMismatch
+    );
     let mut conflicting = action.clone();
     conflicting.arguments = ActionArguments::from_json_str(r#"{"value":2}"#).unwrap();
     let other_approval = ApprovalBinding::bind(&conflicting).unwrap();
