@@ -49,8 +49,7 @@ fn attribution_survives_reconnect_and_rejects_stale_writes() {
         )
         .unwrap();
     assert_eq!(row.get::<_, i64>(0), 5);
-    let payload: serde_json::Value =
-        serde_json::from_str(&row.get::<_, String>(1)).unwrap();
+    let payload: serde_json::Value = serde_json::from_str(&row.get::<_, String>(1)).unwrap();
     assert_eq!(payload, serde_json::json!({"ok":true}));
     db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
         .unwrap();
