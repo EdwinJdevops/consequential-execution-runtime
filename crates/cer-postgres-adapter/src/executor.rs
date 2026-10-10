@@ -1,7 +1,8 @@
 //! Journal-gated execution. An existing or unclaimable operation is never retried.
 use crate::journal::{admit, claim, mark_unknown, Admission, Claim};
 use cer_core::{
-    execute_conditionally, ApprovalBinding, CoordinatedOutcome, ExecutionState, ProposedAction,
+    execute_conditionally, revalidate, ApprovalBinding, CoordinatedOutcome, ExecutionState,
+    ProposedAction,
 };
 use postgres::Client;
 
@@ -25,6 +26,10 @@ pub fn execute_once(
     action: &ProposedAction,
     fresh_state: &str,
 ) -> Result<JournaledOutcome, Box<dyn std::error::Error>> {
+    // Invalid approval or stale observations must not consume an operation ID.
+    if revalidate(ExecutionState::Revalidating, approval, action, fresh_state).is_err() {
+        return Ok(JournaledOutcome::Rejected);
+    }
     let operation_id = &action.action_id;
     let fingerprint = action
         .fingerprint()?
@@ -58,11 +63,14 @@ pub fn execute_once(
     if status == "UNKNOWN" {
         mark_unknown(journal, operation_id)?;
     } else {
-        journal.execute(
+        let changed = journal.execute(
             "UPDATE cer_operation_journal SET status = $2 \
              WHERE operation_id = $1 AND status = 'EXECUTING'",
             &[&operation_id, &status],
         )?;
+        if changed != 1 {
+            return Ok(JournaledOutcome::Unknown);
+        }
     }
     Ok(outcome)
 }
