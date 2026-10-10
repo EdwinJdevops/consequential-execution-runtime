@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/cer-core", "crates/cer-adapter-api"]
+members = ["crates/cer-core", "crates/cer-adapter-api", "crates/cer-postgres-adapter"]
 resolver = "2"
 [workspace.package]
 edition = "2021"
