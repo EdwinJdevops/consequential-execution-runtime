@@ -109,6 +109,12 @@ pub fn execute_atomic(
     };
     // Avoid overflowing the version counter before any resource write.
     let Some(next_version) = expected.checked_add(1) else {
+        tx.execute(
+            "UPDATE cer_operation_journal SET status = 'FAILED'
+             WHERE operation_id = $1 AND status = 'PENDING'",
+            &[&action.action_id],
+        )?;
+        tx.commit()?;
         return Ok(AtomicOutcome::StateChanged);
     };
     let changed = tx.execute(
