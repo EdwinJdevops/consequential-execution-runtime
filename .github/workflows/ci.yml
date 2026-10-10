@@ -9,6 +9,22 @@ permissions:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cer
+          POSTGRES_PASSWORD: cer_test_only
+          POSTGRES_DB: cer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cer -d cer_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CER_TEST_DATABASE_URL: postgres://cer:cer_test_only@localhost:5432/cer_test
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
