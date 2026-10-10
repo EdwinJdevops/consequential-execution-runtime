@@ -13,6 +13,7 @@ pub enum AtomicOutcome {
     ExistingUnresolved,
     IdentityConflict,
     UnsupportedOperation,
+    EvidenceMismatch,
 }
 
 /// Performs one version-checked PostgreSQL mutation with a durable journal
