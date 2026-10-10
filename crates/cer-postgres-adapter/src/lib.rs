@@ -33,7 +33,7 @@ impl ConditionalTarget for PostgresTarget {
         // Query errors are NOT proof of no effect; the coordinator must treat
         // transport failures as ambiguous until reconciled.
         let row = self.client.query_opt(
-            "UPDATE cer_resources SET payload = $3::jsonb, version = version + 1 \
+            "UPDATE cer_resources SET payload = $3::text::jsonb, version = version + 1 \
              WHERE resource_id = $1 AND version = $2 RETURNING version",
             &[
                 &action.resource_id,
