@@ -1,4 +1,5 @@
--- Immutable attribution for PostgreSQL-owned effects. Apply after 0003.
+-- Transactionally recorded attribution for PostgreSQL-owned effects. Apply after 0003.
+-- Not tamper-proof: privileged roles can modify rows; journal deletion cascades.
 -- The same transaction that mutates the resource must insert this evidence.
 CREATE TABLE IF NOT EXISTS cer_postgres_effects (
     operation_id TEXT PRIMARY KEY REFERENCES cer_operation_journal(operation_id) ON DELETE CASCADE,
