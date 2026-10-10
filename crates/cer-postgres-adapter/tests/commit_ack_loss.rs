@@ -146,6 +146,7 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
 
     let mut config: postgres::Config = url.parse().unwrap();
     config
+        .ssl_mode(postgres::config::SslMode::Disable)
         .host("127.0.0.1")
         .port(port)
         .connect_timeout(std::time::Duration::from_secs(5));
