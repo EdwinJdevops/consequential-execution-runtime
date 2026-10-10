@@ -21,8 +21,10 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
     .unwrap();
     db.batch_execute(cer_postgres_adapter::journal::SCHEMA)
         .unwrap();
-    db.batch_execute(include_str!("../migrations/0004_atomic_effect_evidence.sql"))
-        .unwrap();
+    db.batch_execute(include_str!(
+        "../migrations/0004_atomic_effect_evidence.sql"
+    ))
+    .unwrap();
     let id = format!("atomic-{}", std::process::id());
     let resource = format!("resource-{id}");
     db.execute(
@@ -65,8 +67,11 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         execute_atomic(&mut db, &other_approval, &conflicting, "4").unwrap(),
         AtomicOutcome::IdentityConflict
     );
-    db.execute("DELETE FROM cer_postgres_effects WHERE operation_id = $1", &[&id])
-        .unwrap();
+    db.execute(
+        "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
     db.execute(
         "DELETE FROM cer_operation_journal WHERE operation_id = $1",
         &[&id],
