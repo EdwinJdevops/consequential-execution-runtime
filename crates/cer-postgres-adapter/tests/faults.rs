@@ -15,6 +15,8 @@ fn setup(db: &mut Client) {
     .unwrap();
     db.batch_execute(cer_postgres_adapter::journal::SCHEMA)
         .unwrap();
+    db.batch_execute(include_str!("../migrations/0004_atomic_effect_evidence.sql"))
+        .unwrap();
 }
 
 fn action(id: &str, resource: &str) -> ProposedAction {
@@ -179,6 +181,11 @@ fn simultaneous_workers_mutate_once() {
         .get(0);
     assert_eq!(version, 4);
     db.execute(
+        "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    db.execute(
         "DELETE FROM cer_operation_journal WHERE operation_id = $1",
         &[&id],
     )
@@ -282,6 +289,11 @@ fn independent_operations_on_same_version_cannot_both_succeed() {
     assert_eq!(version, 4);
     for n in 0..2 {
         db.execute(
+            "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+            &[&format!("{id}-op-{n}")],
+        )
+        .unwrap();
+        db.execute(
             "DELETE FROM cer_operation_journal WHERE operation_id = $1",
             &[&format!("{id}-op-{n}")],
         )
@@ -326,6 +338,11 @@ fn rejected_admission_does_not_consume_operation_identity() {
         inspect_durable_outcome(&mut db, &different).unwrap(),
         DurableOutcome::IdentityConflict
     );
+    db.execute(
+        "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
     db.execute(
         "DELETE FROM cer_operation_journal WHERE operation_id = $1",
         &[&id],
@@ -372,6 +389,11 @@ fn failed_version_compare_is_durable_and_not_retried() {
         .unwrap()
         .get(0);
     assert_eq!(version, 5);
+    db.execute(
+        "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
     db.execute(
         "DELETE FROM cer_operation_journal WHERE operation_id = $1",
         &[&id],
