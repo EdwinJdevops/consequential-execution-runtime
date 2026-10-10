@@ -1,7 +1,7 @@
 //! Atomic execution for PostgreSQL-owned resources only.
 //! The operation journal and resource mutation share one database transaction.
 use cer_core::{revalidate, ApprovalBinding, ExecutionState, ProposedAction};
-use postgres::Client;
+use postgres::{Client, GenericClient};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AtomicOutcome {
@@ -17,7 +17,7 @@ pub enum AtomicOutcome {
 }
 
 fn evidence_matches(
-    client: &mut postgres::Transaction<'_>,
+    client: &mut impl GenericClient,
     action: &ProposedAction,
     fingerprint: &str,
 ) -> Result<bool, postgres::Error> {
@@ -186,28 +186,10 @@ pub fn inspect_durable_outcome(
     } else {
         match status.as_str() {
             "SUCCEEDED" => {
-                let row = client.query_opt(
-                    "SELECT fingerprint, resource_id, version_before, version_after
-                     FROM cer_postgres_effects WHERE operation_id = $1",
-                    &[&action.action_id],
-                )?;
-                match row {
-                    Some(effect) => {
-                        let effect_fingerprint: String = effect.get(0);
-                        let resource_id: String = effect.get(1);
-                        let before: i64 = effect.get(2);
-                        let after: i64 = effect.get(3);
-                        if effect_fingerprint == fingerprint
-                            && resource_id == action.resource_id
-                            && before.checked_add(1) == Some(after)
-                            && action.observed_state.parse::<i64>().ok() == Some(before)
-                        {
-                            DurableOutcome::Succeeded
-                        } else {
-                            DurableOutcome::EvidenceMismatch
-                        }
-                    }
-                    None => DurableOutcome::EvidenceMismatch,
+                if evidence_matches(client, action, &fingerprint)? {
+                    DurableOutcome::Succeeded
+                } else {
+                    DurableOutcome::EvidenceMismatch
                 }
             }
             "FAILED" => DurableOutcome::Failed,
