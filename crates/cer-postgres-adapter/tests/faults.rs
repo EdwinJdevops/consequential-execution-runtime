@@ -290,3 +290,93 @@ fn independent_operations_on_same_version_cannot_both_succeed() {
     db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
         .unwrap();
 }
+
+#[test]
+fn rejected_admission_does_not_consume_operation_identity() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("admission-{}", std::process::id());
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    setup(&mut db);
+    db.execute(
+        "INSERT INTO cer_resources (resource_id, version, payload)
+         VALUES ($1, 3, '{}'::jsonb)",
+        &[&id],
+    )
+    .unwrap();
+    let a = action(&id, &id);
+    let approval = ApprovalBinding::bind(&a).unwrap();
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, "4").unwrap(),
+        AtomicOutcome::Rejected
+    );
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &a).unwrap(),
+        DurableOutcome::Absent
+    );
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, "3").unwrap(),
+        AtomicOutcome::Applied
+    );
+    let mut different = a.clone();
+    different.arguments = ActionArguments::from_json_str(r#"{"value":2}"#).unwrap();
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &different).unwrap(),
+        DurableOutcome::IdentityConflict
+    );
+    db.execute(
+        "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
+
+#[test]
+fn failed_version_compare_is_durable_and_not_retried() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("failed-{}", std::process::id());
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    setup(&mut db);
+    db.execute(
+        "INSERT INTO cer_resources (resource_id, version, payload)
+         VALUES ($1, 5, '{}'::jsonb)",
+        &[&id],
+    )
+    .unwrap();
+    let a = action(&id, &id);
+    let approval = ApprovalBinding::bind(&a).unwrap();
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, "3").unwrap(),
+        AtomicOutcome::StateChanged
+    );
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &a).unwrap(),
+        DurableOutcome::Failed
+    );
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, "5").unwrap(),
+        AtomicOutcome::ExistingFailed
+    );
+    let version: i64 = db
+        .query_one(
+            "SELECT version FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(version, 5);
+    db.execute(
+        "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
