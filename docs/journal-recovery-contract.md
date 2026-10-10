@@ -34,3 +34,7 @@ The implementation is **not production-ready**. Required before AWS mutations: i
 ## PostgreSQL-owned atomic path
 
 `transactional::execute_atomic` is a separate PostgreSQL-only API that writes the journal and resource in one transaction. On an uncertain COMMIT response, reconnect and read the durable journal; do not assume failure. The older `executor::execute_once` remains non-atomic and must not be used as a production substitute. This atomicity does not extend to AWS or any other external service.
+
+## Recovery lookup ordering
+
+The atomic executor checks approval-to-action identity, then consults the durable operation identity before revalidating the current resource version for a *new* operation. This is required because successful operations change the version: a replay must report the existing durable outcome rather than be misclassified as a stale new request. Conflicting fingerprints remain conflicts regardless of the current resource version. A failed or unresolved durable operation must not be silently retried.
