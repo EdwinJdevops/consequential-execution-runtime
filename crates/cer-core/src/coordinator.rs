@@ -20,12 +20,11 @@ pub enum ConditionalOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CoordinatedOutcome<E> {
+pub enum CoordinatedOutcome {
     Completed,
     Rejected(AdmissionError),
     StateChanged,
     ExecutionUnknown,
-    TargetError(E),
 }
 
 pub fn execute_conditionally<T: ConditionalTarget>(
@@ -34,7 +33,7 @@ pub fn execute_conditionally<T: ConditionalTarget>(
     approval: &ApprovalBinding,
     action: &ProposedAction,
     fresh_state: &str,
-) -> CoordinatedOutcome<T::Error> {
+) -> CoordinatedOutcome {
     let permit = match revalidate(state, approval, action, fresh_state) {
         Ok(permit) => permit,
         Err(error) => return CoordinatedOutcome::Rejected(error),
@@ -46,7 +45,7 @@ pub fn execute_conditionally<T: ConditionalTarget>(
         Ok(ConditionalOutcome::Applied) => CoordinatedOutcome::Completed,
         Ok(ConditionalOutcome::StateChanged) => CoordinatedOutcome::StateChanged,
         Ok(ConditionalOutcome::Unknown) => CoordinatedOutcome::ExecutionUnknown,
-        Err(error) => CoordinatedOutcome::TargetError(error),
+        Err(_) => CoordinatedOutcome::ExecutionUnknown,
     }
 }
 
@@ -91,6 +90,36 @@ mod tests {
             observed_state: "v1".into(),
             policy_version: "p1".into(),
         }
+    }
+
+    struct FailedTarget;
+
+    impl ConditionalTarget for FailedTarget {
+        type Error = ();
+
+        fn compare_and_execute(
+            &mut self,
+            _action: &ProposedAction,
+            _expected_state: &str,
+        ) -> Result<ConditionalOutcome, Self::Error> {
+            Err(())
+        }
+    }
+
+    #[test]
+    fn adapter_error_is_ambiguous_not_proven_failure() {
+        let action = action();
+        let approval = ApprovalBinding::bind(&action).unwrap();
+        assert_eq!(
+            execute_conditionally(
+                &mut FailedTarget,
+                ExecutionState::Revalidating,
+                &approval,
+                &action,
+                "v1"
+            ),
+            CoordinatedOutcome::ExecutionUnknown
+        );
     }
 
     #[test]
