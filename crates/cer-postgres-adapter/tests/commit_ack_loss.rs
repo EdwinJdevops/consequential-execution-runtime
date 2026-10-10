@@ -153,7 +153,10 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
     let result = execute_atomic(&mut worker, &approval, &action, "3");
     drop(worker);
     proxy.join().unwrap();
-    assert!(result.is_err(), "worker must not receive COMMIT acknowledgment: {result:?}");
+    assert!(
+        result.is_err(),
+        "worker must not receive COMMIT acknowledgment: {result:?}"
+    );
     assert!(
         suppressed.load(Ordering::SeqCst),
         "proxy did not suppress COMMIT ReadyForQuery"
