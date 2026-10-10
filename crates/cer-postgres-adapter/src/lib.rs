@@ -1,3 +1,5 @@
+pub mod journal;
+
 #![forbid(unsafe_code)]
 
 use cer_core::{ConditionalOutcome, ConditionalTarget, ProposedAction};
