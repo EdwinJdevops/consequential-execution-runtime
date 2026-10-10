@@ -20,7 +20,10 @@ fn packet(stream: &mut TcpStream) -> std::io::Result<(u8, Vec<u8>)> {
     stream.read_exact(&mut head)?;
     let size = u32::from_be_bytes(head[1..5].try_into().unwrap()) as usize;
     if !(4..=16_777_216).contains(&size) {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid frame"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid frame",
+        ));
     }
     let mut frame = head.to_vec();
     frame.resize(size + 1, 0);
@@ -35,23 +38,37 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         return;
     };
     let mut admin = Client::connect(&url, NoTls).unwrap();
-    admin.batch_execute("SELECT pg_advisory_lock(72451639)").unwrap();
-    admin.batch_execute(
-        "CREATE TABLE IF NOT EXISTS cer_resources (
+    admin
+        .batch_execute("SELECT pg_advisory_lock(72451639)")
+        .unwrap();
+    admin
+        .batch_execute(
+            "CREATE TABLE IF NOT EXISTS cer_resources (
            resource_id TEXT PRIMARY KEY, version BIGINT NOT NULL, payload JSONB NOT NULL
          );
          ALTER TABLE cer_resources ADD COLUMN IF NOT EXISTS last_operation_id TEXT;",
-    ).unwrap();
-    admin.batch_execute(cer_postgres_adapter::journal::SCHEMA).unwrap();
-    admin.batch_execute(include_str!("../migrations/0004_atomic_effect_evidence.sql")).unwrap();
-    admin.batch_execute("SELECT pg_advisory_unlock(72451639)").unwrap();
+        )
+        .unwrap();
+    admin
+        .batch_execute(cer_postgres_adapter::journal::SCHEMA)
+        .unwrap();
+    admin
+        .batch_execute(include_str!(
+            "../migrations/0004_atomic_effect_evidence.sql"
+        ))
+        .unwrap();
+    admin
+        .batch_execute("SELECT pg_advisory_unlock(72451639)")
+        .unwrap();
 
     let id = format!("ack-loss-{}", std::process::id());
-    admin.execute(
-        "INSERT INTO cer_resources (resource_id, version, payload)
+    admin
+        .execute(
+            "INSERT INTO cer_resources (resource_id, version, payload)
          VALUES ($1, 3, '{}'::jsonb)",
-        &[&id],
-    ).unwrap();
+            &[&id],
+        )
+        .unwrap();
     let action = ProposedAction {
         action_id: id.clone(),
         resource_id: id.clone(),
@@ -68,9 +85,13 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
     let suppressed_proxy = Arc::clone(&suppressed);
     let proxy = thread::spawn(move || {
         let (mut downstream, _) = listener.accept().unwrap();
-        downstream.set_read_timeout(Some(std::time::Duration::from_secs(15))).unwrap();
+        downstream
+            .set_read_timeout(Some(std::time::Duration::from_secs(15)))
+            .unwrap();
         let mut upstream = TcpStream::connect("127.0.0.1:5432").unwrap();
-        upstream.set_read_timeout(Some(std::time::Duration::from_secs(15))).unwrap();
+        upstream
+            .set_read_timeout(Some(std::time::Duration::from_secs(15)))
+            .unwrap();
 
         // Startup is length-prefixed, without a message-type byte.
         let mut startup_len = [0_u8; 4];
@@ -102,8 +123,7 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         });
 
         while let Ok((kind, frame)) = packet(&mut downstream) {
-            let commit = kind == b'Q'
-                && frame[5..].starts_with(b"COMMIT");
+            let commit = kind == b'Q' && frame[5..].starts_with(b"COMMIT");
             if commit {
                 commit_forwarded.store(true, Ordering::SeqCst);
             }
@@ -115,28 +135,55 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
     });
 
     let mut config: postgres::Config = url.parse().unwrap();
-    config.host("127.0.0.1").port(port).connect_timeout(std::time::Duration::from_secs(5));
+    config
+        .host("127.0.0.1")
+        .port(port)
+        .connect_timeout(std::time::Duration::from_secs(5));
     let mut worker = config.connect(NoTls).unwrap();
     let result = execute_atomic(&mut worker, &approval, &action, "3");
-    assert!(result.is_err(), "worker must not receive COMMIT acknowledgment");
+    assert!(
+        result.is_err(),
+        "worker must not receive COMMIT acknowledgment"
+    );
     drop(worker);
     proxy.join().unwrap();
-    assert!(suppressed.load(Ordering::SeqCst), "proxy did not suppress COMMIT ReadyForQuery");
+    assert!(
+        suppressed.load(Ordering::SeqCst),
+        "proxy did not suppress COMMIT ReadyForQuery"
+    );
 
     let mut recovery = Client::connect(&url, NoTls).unwrap();
-    assert_eq!(inspect_durable_outcome(&mut recovery, &action).unwrap(), DurableOutcome::Succeeded);
-    assert_eq!(execute_atomic(&mut recovery, &approval, &action, "3").unwrap(), AtomicOutcome::AlreadyApplied);
-    let row = recovery.query_one(
-        "SELECT version, last_operation_id FROM cer_resources WHERE resource_id = $1",
-        &[&id],
-    ).unwrap();
+    assert_eq!(
+        inspect_durable_outcome(&mut recovery, &action).unwrap(),
+        DurableOutcome::Succeeded
+    );
+    assert_eq!(
+        execute_atomic(&mut recovery, &approval, &action, "3").unwrap(),
+        AtomicOutcome::AlreadyApplied
+    );
+    let row = recovery
+        .query_one(
+            "SELECT version, last_operation_id FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap();
     assert_eq!(row.get::<_, i64>(0), 4);
     assert_eq!(row.get::<_, String>(1), id);
-    let count: i64 = recovery.query_one(
-        "SELECT count(*) FROM cer_postgres_effects WHERE operation_id = $1",
-        &[&id],
-    ).unwrap().get(0);
+    let count: i64 = recovery
+        .query_one(
+            "SELECT count(*) FROM cer_postgres_effects WHERE operation_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
     assert_eq!(count, 1);
-    recovery.execute("DELETE FROM cer_operation_journal WHERE operation_id = $1", &[&id]).unwrap();
-    recovery.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id]).unwrap();
+    recovery
+        .execute(
+            "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+            &[&id],
+        )
+        .unwrap();
+    recovery
+        .execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
 }
