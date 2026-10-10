@@ -4,6 +4,7 @@ pub mod attribution;
 pub mod executor;
 pub mod journal;
 pub mod observation;
+pub mod transactional;
 
 use cer_core::{ConditionalOutcome, ConditionalTarget, ProposedAction};
 use postgres::Client;
