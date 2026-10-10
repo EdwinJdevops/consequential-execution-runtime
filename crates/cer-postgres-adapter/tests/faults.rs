@@ -258,11 +258,17 @@ fn independent_operations_on_same_version_cannot_both_succeed() {
         .collect();
     let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
     assert_eq!(
-        outcomes.iter().filter(|o| **o == AtomicOutcome::Applied).count(),
+        outcomes
+            .iter()
+            .filter(|o| **o == AtomicOutcome::Applied)
+            .count(),
         1
     );
     assert_eq!(
-        outcomes.iter().filter(|o| **o == AtomicOutcome::StateChanged).count(),
+        outcomes
+            .iter()
+            .filter(|o| **o == AtomicOutcome::StateChanged)
+            .count(),
         1
     );
     let mut db = Client::connect(&url, NoTls).unwrap();
