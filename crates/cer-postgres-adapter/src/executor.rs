@@ -3,7 +3,7 @@ use crate::journal::{admit, claim, mark_unknown, Admission, Claim};
 use cer_core::{
     execute_conditionally, ApprovalBinding, CoordinatedOutcome, ExecutionState, ProposedAction,
 };
-use postgres::{Client, Error};
+use postgres::Client;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JournaledOutcome {
@@ -21,18 +21,23 @@ pub enum JournaledOutcome {
 pub fn execute_once(
     journal: &mut Client,
     target: &mut crate::PostgresTarget,
-    operation_id: &str,
-    fingerprint: &str,
     approval: &ApprovalBinding,
     action: &ProposedAction,
     fresh_state: &str,
-) -> Result<JournaledOutcome, Error> {
-    match admit(journal, operation_id, fingerprint)? {
+) -> Result<JournaledOutcome, Box<dyn std::error::Error>> {
+    let operation_id = &action.action_id;
+    let fingerprint = action
+        .fingerprint()?
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    match admit(journal, operation_id, &fingerprint)? {
         Admission::Existing => return Ok(JournaledOutcome::AlreadyExists),
         Admission::Conflict => return Ok(JournaledOutcome::IdentityConflict),
         Admission::New => {}
     }
-    if claim(journal, operation_id, fingerprint)? != Claim::Claimed {
+    if claim(journal, operation_id, &fingerprint)? != Claim::Claimed {
         return Ok(JournaledOutcome::NotClaimable);
     }
     let result = execute_conditionally(
