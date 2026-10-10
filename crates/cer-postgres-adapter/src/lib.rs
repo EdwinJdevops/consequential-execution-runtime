@@ -2,6 +2,7 @@
 
 pub mod executor;
 pub mod journal;
+pub mod observation;
 
 use cer_core::{ConditionalOutcome, ConditionalTarget, ProposedAction};
 use postgres::Client;
