@@ -12,6 +12,7 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         return;
     };
     let mut db = Client::connect(&url, NoTls).unwrap();
+    db.batch_execute("SELECT pg_advisory_lock(72451639);").unwrap();
     db.batch_execute(
         "CREATE TABLE IF NOT EXISTS cer_resources (
             resource_id TEXT PRIMARY KEY, version BIGINT NOT NULL, payload JSONB NOT NULL
@@ -25,6 +26,7 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         "../migrations/0004_atomic_effect_evidence.sql"
     ))
     .unwrap();
+    db.batch_execute("SELECT pg_advisory_unlock(72451639);").unwrap();
     let id = format!("atomic-{}", std::process::id());
     let resource = format!("resource-{id}");
     db.execute(
