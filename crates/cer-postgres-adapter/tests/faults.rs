@@ -482,3 +482,58 @@ fn backend_termination_before_commit_rolls_back_all_effects() {
         .execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
         .unwrap();
 }
+
+#[test]
+fn version_overflow_is_durably_failed_and_cannot_replay() {
+    let Ok(url) = std::env::var("CER_TEST_DATABASE_URL") else {
+        assert!(std::env::var("CI").is_err(), "CI requires database");
+        return;
+    };
+    let id = format!("overflow-{}", std::process::id());
+    let mut db = Client::connect(&url, NoTls).unwrap();
+    setup(&mut db);
+    db.execute(
+        "INSERT INTO cer_resources (resource_id, version, payload)
+         VALUES ($1, $2, '{}'::jsonb)",
+        &[&id, &i64::MAX],
+    )
+    .unwrap();
+    let mut a = action(&id, &id);
+    a.observed_state = i64::MAX.to_string();
+    let approval = ApprovalBinding::bind(&a).unwrap();
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, &a.observed_state).unwrap(),
+        AtomicOutcome::StateChanged
+    );
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &a).unwrap(),
+        DurableOutcome::Failed
+    );
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &a, &a.observed_state).unwrap(),
+        AtomicOutcome::ExistingFailed
+    );
+    let row = db
+        .query_one(
+            "SELECT version, last_operation_id FROM cer_resources WHERE resource_id = $1",
+            &[&id],
+        )
+        .unwrap();
+    assert_eq!(row.get::<_, i64>(0), i64::MAX);
+    assert_eq!(row.get::<_, Option<String>>(1), None);
+    let count: i64 = db
+        .query_one(
+            "SELECT count(*) FROM cer_postgres_effects WHERE operation_id = $1",
+            &[&id],
+        )
+        .unwrap()
+        .get(0);
+    assert_eq!(count, 0);
+    db.execute(
+        "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    db.execute("DELETE FROM cer_resources WHERE resource_id = $1", &[&id])
+        .unwrap();
+}
