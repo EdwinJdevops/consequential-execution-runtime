@@ -15,8 +15,10 @@ fn setup(db: &mut Client) {
     .unwrap();
     db.batch_execute(cer_postgres_adapter::journal::SCHEMA)
         .unwrap();
-    db.batch_execute(include_str!("../migrations/0004_atomic_effect_evidence.sql"))
-        .unwrap();
+    db.batch_execute(include_str!(
+        "../migrations/0004_atomic_effect_evidence.sql"
+    ))
+    .unwrap();
 }
 
 fn action(id: &str, resource: &str) -> ProposedAction {
