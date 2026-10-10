@@ -12,7 +12,10 @@ fn only_one_concurrent_claim_and_unknown_blocks_replay() {
     let mut admin = Client::connect(&url, NoTls).unwrap();
     admin.batch_execute(SCHEMA).unwrap();
     let id = format!("claim-{}", std::process::id());
-    assert_eq!(admit(&mut admin, &id, "fingerprint").unwrap(), Admission::New);
+    assert_eq!(
+        admit(&mut admin, &id, "fingerprint").unwrap(),
+        Admission::New
+    );
     let barrier = Arc::new(Barrier::new(3));
     let mut handles = Vec::new();
     for _ in 0..2 {
@@ -31,16 +34,25 @@ fn only_one_concurrent_claim_and_unknown_blocks_replay() {
         .map(|handle| handle.join().unwrap())
         .collect();
     assert_eq!(
-        outcomes.iter().filter(|outcome| **outcome == Claim::Claimed).count(),
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == Claim::Claimed)
+            .count(),
         1
     );
     assert_eq!(
-        outcomes.iter().filter(|outcome| **outcome == Claim::NotClaimable).count(),
+        outcomes
+            .iter()
+            .filter(|outcome| **outcome == Claim::NotClaimable)
+            .count(),
         1
     );
     assert!(mark_unknown(&mut admin, &id).unwrap());
     assert!(!mark_unknown(&mut admin, &id).unwrap());
-    assert_eq!(claim(&mut admin, &id, "fingerprint").unwrap(), Claim::NotClaimable);
+    assert_eq!(
+        claim(&mut admin, &id, "fingerprint").unwrap(),
+        Claim::NotClaimable
+    );
     admin
         .execute(
             "DELETE FROM cer_operation_journal WHERE operation_id = $1",
