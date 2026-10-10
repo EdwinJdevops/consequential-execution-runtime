@@ -44,3 +44,35 @@ pub const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS cer_operation_journal (\
     fingerprint TEXT NOT NULL, \
     status TEXT NOT NULL CHECK (status IN ('PENDING', 'EXECUTING', 'UNKNOWN', 'SUCCEEDED', 'FAILED'))\
 )";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Claim {
+    Claimed,
+    NotClaimable,
+}
+
+/// Atomically moves a newly admitted operation to EXECUTING.
+/// An existing, unknown, or terminal operation is never claimed again.
+pub fn claim(client: &mut Client, operation_id: &str, fingerprint: &str) -> Result<Claim, Error> {
+    let changed = client.execute(
+        "UPDATE cer_operation_journal SET status = 'EXECUTING' \
+         WHERE operation_id = $1 AND fingerprint = $2 AND status = 'PENDING'",
+        &[&operation_id, &fingerprint],
+    )?;
+    Ok(if changed == 1 {
+        Claim::Claimed
+    } else {
+        Claim::NotClaimable
+    })
+}
+
+/// Fail closed after an execution attempt whose effect cannot be proven.
+/// Only the owner of the execution path should invoke this transition.
+pub fn mark_unknown(client: &mut Client, operation_id: &str) -> Result<bool, Error> {
+    let changed = client.execute(
+        "UPDATE cer_operation_journal SET status = 'UNKNOWN' \
+         WHERE operation_id = $1 AND status = 'EXECUTING'",
+        &[&operation_id],
+    )?;
+    Ok(changed == 1)
+}
