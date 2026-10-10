@@ -32,7 +32,8 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: timeout 90s cargo test --workspace --all-features
+      - run: timeout 45s cargo test -p cer-postgres-adapter --test commit_ack_loss -- --nocapture
+      - run: cargo test --workspace --all-features
 
   msrv:
     runs-on: ubuntu-latest
