@@ -142,6 +142,7 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
             }
         }
         response.join().unwrap();
+        let _ = downstream.shutdown(Shutdown::Both);
     });
 
     let mut config: postgres::Config = url.parse().unwrap();
