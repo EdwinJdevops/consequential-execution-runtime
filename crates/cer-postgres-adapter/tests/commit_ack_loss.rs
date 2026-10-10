@@ -151,12 +151,9 @@ fn commit_applied_but_ack_dropped_is_reconciled_without_second_effect() {
         .connect_timeout(std::time::Duration::from_secs(5));
     let mut worker = config.connect(NoTls).unwrap();
     let result = execute_atomic(&mut worker, &approval, &action, "3");
-    assert!(
-        result.is_err(),
-        "worker must not receive COMMIT acknowledgment"
-    );
     drop(worker);
     proxy.join().unwrap();
+    assert!(result.is_err(), "worker must not receive COMMIT acknowledgment: {result:?}");
     assert!(
         suppressed.load(Ordering::SeqCst),
         "proxy did not suppress COMMIT ReadyForQuery"
