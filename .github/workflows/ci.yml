@@ -32,7 +32,7 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo test --workspace --all-features
+      - run: timeout 90s cargo test --workspace --all-features
 
   msrv:
     runs-on: ubuntu-latest
