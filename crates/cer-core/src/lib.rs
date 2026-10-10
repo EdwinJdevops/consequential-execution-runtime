@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admission;
+pub mod coordinator;
 pub mod approval;
 pub mod arguments;
 pub mod effect;
@@ -8,6 +9,7 @@ pub mod execution;
 pub mod identity;
 pub mod recovery;
 
+pub use coordinator::{execute_conditionally, ConditionalOutcome, ConditionalTarget, CoordinatedOutcome};
 pub use admission::{revalidate, AdmissionError, Revalidated};
 pub use approval::{ApprovalBinding, ProposedAction};
 pub use arguments::{ActionArguments, ArgumentError};
