@@ -80,6 +80,23 @@ fn journal_and_mutation_commit_together_and_replay_is_read_only() {
         inspect_durable_outcome(&mut db, &action).unwrap(),
         DurableOutcome::EvidenceMismatch
     );
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &action, "4").unwrap(),
+        AtomicOutcome::EvidenceMismatch
+    );
+    db.execute(
+        "DELETE FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&id],
+    )
+    .unwrap();
+    assert_eq!(
+        inspect_durable_outcome(&mut db, &action).unwrap(),
+        DurableOutcome::EvidenceMismatch
+    );
+    assert_eq!(
+        execute_atomic(&mut db, &approval, &action, "4").unwrap(),
+        AtomicOutcome::EvidenceMismatch
+    );
     let mut conflicting = action.clone();
     conflicting.arguments = ActionArguments::from_json_str(r#"{"value":2}"#).unwrap();
     let other_approval = ApprovalBinding::bind(&conflicting).unwrap();

@@ -1,7 +1,7 @@
 //! Atomic execution for PostgreSQL-owned resources only.
 //! The operation journal and resource mutation share one database transaction.
 use cer_core::{revalidate, ApprovalBinding, ExecutionState, ProposedAction};
-use postgres::Client;
+use postgres::{Client, GenericClient};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AtomicOutcome {
@@ -13,6 +13,30 @@ pub enum AtomicOutcome {
     ExistingUnresolved,
     IdentityConflict,
     UnsupportedOperation,
+    EvidenceMismatch,
+}
+
+fn evidence_matches(
+    client: &mut impl GenericClient,
+    action: &ProposedAction,
+    fingerprint: &str,
+) -> Result<bool, postgres::Error> {
+    let row = client.query_opt(
+        "SELECT fingerprint, resource_id, version_before, version_after
+         FROM cer_postgres_effects WHERE operation_id = $1",
+        &[&action.action_id],
+    )?;
+    let Some(row) = row else {
+        return Ok(false);
+    };
+    let stored: String = row.get(0);
+    let resource: String = row.get(1);
+    let before: i64 = row.get(2);
+    let after: i64 = row.get(3);
+    Ok(stored == fingerprint
+        && resource == action.resource_id
+        && before.checked_add(1) == Some(after)
+        && action.observed_state.parse::<i64>().ok() == Some(before))
 }
 
 /// Performs one version-checked PostgreSQL mutation with a durable journal
@@ -55,7 +79,11 @@ pub fn execute_atomic(
         return Ok(if existing != fingerprint {
             AtomicOutcome::IdentityConflict
         } else if status == "SUCCEEDED" {
-            AtomicOutcome::AlreadyApplied
+            if evidence_matches(&mut tx, action, &fingerprint)? {
+                AtomicOutcome::AlreadyApplied
+            } else {
+                AtomicOutcome::EvidenceMismatch
+            }
         } else if status == "FAILED" {
             AtomicOutcome::ExistingFailed
         } else {
@@ -158,28 +186,10 @@ pub fn inspect_durable_outcome(
     } else {
         match status.as_str() {
             "SUCCEEDED" => {
-                let row = client.query_opt(
-                    "SELECT fingerprint, resource_id, version_before, version_after
-                     FROM cer_postgres_effects WHERE operation_id = $1",
-                    &[&action.action_id],
-                )?;
-                match row {
-                    Some(effect) => {
-                        let effect_fingerprint: String = effect.get(0);
-                        let resource_id: String = effect.get(1);
-                        let before: i64 = effect.get(2);
-                        let after: i64 = effect.get(3);
-                        if effect_fingerprint == fingerprint
-                            && resource_id == action.resource_id
-                            && before.checked_add(1) == Some(after)
-                            && action.observed_state.parse::<i64>().ok() == Some(before)
-                        {
-                            DurableOutcome::Succeeded
-                        } else {
-                            DurableOutcome::EvidenceMismatch
-                        }
-                    }
-                    None => DurableOutcome::EvidenceMismatch,
+                if evidence_matches(client, action, &fingerprint)? {
+                    DurableOutcome::Succeeded
+                } else {
+                    DurableOutcome::EvidenceMismatch
                 }
             }
             "FAILED" => DurableOutcome::Failed,
