@@ -55,6 +55,9 @@ fn concurrent_duplicate_admission_and_conflicting_intent() {
         .unwrap();
     assert_eq!(row.get::<_, i64>(0), 1);
     admin
-        .execute("DELETE FROM cer_operation_journal WHERE operation_id = $1", &[&id])
+        .execute(
+            "DELETE FROM cer_operation_journal WHERE operation_id = $1",
+            &[&id],
+        )
         .unwrap();
 }
