@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod attribution;
 pub mod executor;
 pub mod journal;
 pub mod observation;
